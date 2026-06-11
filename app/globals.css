@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Avenir Next", "Helvetica Neue", sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", monospace;
+}
+
+html {
+  background: #050507;
+  scrollbar-gutter: stable;
+}
+
+body {
+  min-height: 100vh;
+  background: #050507;
+}
+
+::selection {
+  background: rgba(103, 232, 249, 0.35);
+  color: #ffffff;
+}
