@@ -19,6 +19,8 @@ create table if not exists public.job_listings (
   location text,
   employment_type text,
   seniority text,
+  target_role text,
+  niche text,
   source_url text,
   description text not null,
   requirements text,
@@ -35,6 +37,8 @@ create table if not exists public.user_profiles (
   linkedin_url text,
   headline text,
   target_fields text[] not null default '{}',
+  target_preferences jsonb not null default '{}'::jsonb,
+  target_job text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -66,6 +70,14 @@ create table if not exists public.user_work_history (
 
 create index if not exists job_listings_category_id_idx
   on public.job_listings(category_id);
+
+alter table public.job_listings
+  add column if not exists target_role text,
+  add column if not exists niche text;
+
+alter table public.user_profiles
+  add column if not exists target_preferences jsonb not null default '{}'::jsonb,
+  add column if not exists target_job text;
 
 create index if not exists job_listings_active_posted_idx
   on public.job_listings(is_active, posted_at desc);

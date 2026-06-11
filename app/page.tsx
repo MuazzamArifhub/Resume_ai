@@ -41,7 +41,7 @@ import type {
 } from "@/lib/supabase/types"
 import { cn } from "@/lib/utils"
 
-type Step = "landing" | "auth" | "fields" | "preferences" | "builder"
+type Step = "landing" | "fields" | "preferences" | "job-select" | "auth" | "builder"
 
 type CareerField = {
   name: string
@@ -112,6 +112,45 @@ const FIELD_PREFERENCES: Record<string, string[]> = {
   "Strategy Consulting": ["MBB", "Other Consultancies"],
 }
 
+const TARGET_JOBS: Record<string, string[]> = {
+  "Investment Banking": [
+    "Investment Banking Analyst",
+    "M&A Analyst",
+    "Capital Markets Analyst",
+    "Restructuring Analyst",
+  ],
+  "Strategy Consulting": [
+    "Strategy Analyst",
+    "Business Analyst",
+    "Management Consultant",
+    "Implementation Consultant",
+  ],
+  "Private Equity": [
+    "Private Equity Analyst",
+    "Growth Equity Analyst",
+    "Private Credit Analyst",
+    "Investment Analyst",
+  ],
+  "Hedge Funds": [
+    "Investment Research Analyst",
+    "Equity Research Analyst",
+    "Quant Research Analyst",
+    "Credit Research Analyst",
+  ],
+  "Sales & Trading": [
+    "Sales & Trading Analyst",
+    "Rates Trading Analyst",
+    "Credit Trading Analyst",
+    "Structuring Analyst",
+  ],
+  "Transaction Advisory": [
+    "Transaction Advisory Analyst",
+    "Financial Due Diligence Analyst",
+    "Valuations Analyst",
+    "Deal Advisory Analyst",
+  ],
+}
+
 function getRequiredPreferenceFields(selectedFields: string[]) {
   return selectedFields.filter((field) => FIELD_PREFERENCES[field])
 }
@@ -173,6 +212,7 @@ export default function Page() {
   const [targetPreferences, setTargetPreferences] = useState<TargetPreferences>(
     {}
   )
+  const [selectedTargetJob, setSelectedTargetJob] = useState("")
   const [fullName, setFullName] = useState("")
   const [linkedinUrl, setLinkedinUrl] = useState("")
   const [previousResume, setPreviousResume] = useState("")
@@ -229,7 +269,9 @@ export default function Page() {
 
     supabase
       .from("user_profiles")
-      .select("full_name, linkedin_url, target_fields")
+      .select(
+        "full_name, linkedin_url, target_fields, target_preferences, target_job"
+      )
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -239,6 +281,14 @@ export default function Page() {
 
         setFullName(data.full_name || "")
         setLinkedinUrl(data.linkedin_url || "")
+        setSelectedTargetJob(data.target_job || "")
+        if (
+          data.target_preferences &&
+          typeof data.target_preferences === "object" &&
+          !Array.isArray(data.target_preferences)
+        ) {
+          setTargetPreferences(data.target_preferences as TargetPreferences)
+        }
         if (Array.isArray(data.target_fields) && data.target_fields.length) {
           setSelectedFields(data.target_fields)
         }
@@ -326,15 +376,19 @@ export default function Page() {
   }
 
   function findJob() {
-    setStep(user ? "fields" : "auth")
+    setStep("builder")
   }
 
   function continueFromFields() {
     setStep(
       getRequiredPreferenceFields(selectedFields).length
         ? "preferences"
-        : "builder"
+        : "job-select"
     )
+  }
+
+  function continueFromTargetJob() {
+    setStep(user ? "builder" : "auth")
   }
 
   async function signInWithProvider(provider: Provider) {
@@ -407,6 +461,8 @@ export default function Page() {
       full_name: fullName,
       linkedin_url: linkedinUrl,
       target_fields: selectedFields,
+      target_preferences: targetPreferences,
+      target_job: selectedTargetJob,
     })
 
     if (profileError) {
@@ -509,6 +565,7 @@ export default function Page() {
           targetFields: selectedFields,
           targetCategory: selectedFields.join(", "),
           targetPreferences,
+          targetJob: selectedTargetJob,
           linkedinUrl,
           previousResume,
           workHistory,
@@ -559,7 +616,7 @@ export default function Page() {
             isSignUp={isSignUp}
             isAuthLoading={isAuthLoading}
             isProfileSaving={isProfileSaving}
-            onBack={() => setStep("landing")}
+            onBack={() => setStep("job-select")}
             onProviderSignIn={signInWithProvider}
             onEmailAuth={submitEmailAuth}
             onToggleAuthMode={() => setIsSignUp((value) => !value)}
@@ -592,7 +649,25 @@ export default function Page() {
             targetPreferences={targetPreferences}
             onSelect={choosePreference}
             onBack={() => setStep("fields")}
-            onContinue={() => setStep("builder")}
+            onContinue={() => setStep("job-select")}
+          />
+        ) : null}
+
+        {step === "job-select" ? (
+          <TargetJobScreen
+            key="job-select"
+            selectedFields={selectedFields}
+            targetPreferences={targetPreferences}
+            selectedTargetJob={selectedTargetJob}
+            onSelect={setSelectedTargetJob}
+            onBack={() =>
+              setStep(
+                getRequiredPreferenceFields(selectedFields).length
+                  ? "preferences"
+                  : "fields"
+              )
+            }
+            onContinue={continueFromTargetJob}
           />
         ) : null}
 
@@ -601,6 +676,7 @@ export default function Page() {
             key="builder"
             selectedFields={selectedFields}
             targetPreferences={targetPreferences}
+            selectedTargetJob={selectedTargetJob}
             linkedinUrl={linkedinUrl}
             previousResume={previousResume}
             workHistory={workHistory}
@@ -612,9 +688,7 @@ export default function Page() {
             isGenerating={isGenerating}
             onBack={() =>
               setStep(
-                getRequiredPreferenceFields(selectedFields).length
-                  ? "preferences"
-                  : "fields"
+                user ? "job-select" : "auth"
               )
             }
             onGenerate={generateResume}
@@ -1369,9 +1443,104 @@ function PreferenceGroup({
   )
 }
 
+function TargetJobScreen({
+  selectedFields,
+  targetPreferences,
+  selectedTargetJob,
+  onSelect,
+  onBack,
+  onContinue,
+}: {
+  selectedFields: string[]
+  targetPreferences: TargetPreferences
+  selectedTargetJob: string
+  onSelect: (job: string) => void
+  onBack: () => void
+  onContinue: () => void
+}) {
+  const jobs = selectedFields.flatMap((field) =>
+    (TARGET_JOBS[field] || []).map((job) => ({ field, job }))
+  )
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 18 }}
+      transition={{ duration: 0.42 }}
+      className="relative z-10 min-h-screen px-5 pt-28 pb-28 md:px-10"
+    >
+      <StepHeader
+        eyebrow="Target role"
+        title="Choose the specific job you want"
+        body="Pick one role inside your niche before signing in. HYFY will use this to shape listings, resume keywords, and cover letter positioning."
+        onBack={onBack}
+      />
+
+      <div className="mx-auto mt-10 grid max-w-6xl gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {jobs.map(({ field, job }, index) => {
+          const active = selectedTargetJob === job
+
+          return (
+            <motion.button
+              key={`${field}-${job}`}
+              type="button"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.025, duration: 0.32 }}
+              onClick={() => onSelect(job)}
+              className={cn(
+                "min-h-40 rounded-lg border p-5 text-left transition",
+                active
+                  ? "border-white bg-white text-[#071120]"
+                  : "border-white/10 bg-white/[0.035] text-white hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.06]"
+              )}
+            >
+              <span
+                className={cn(
+                  "mb-4 inline-flex h-9 items-center rounded-full border px-3 text-xs font-black tracking-[0.12em] uppercase",
+                  active
+                    ? "border-black/10 bg-black text-white"
+                    : "border-white/15 bg-white text-black"
+                )}
+              >
+                {field}
+              </span>
+              <span className="block text-2xl font-black leading-tight">
+                {job}
+              </span>
+              {targetPreferences[field] ? (
+                <span
+                  className={cn(
+                    "mt-4 inline-flex rounded-full border px-3 py-1 text-xs font-bold",
+                    active
+                      ? "border-black/10 bg-black/[0.04] text-slate-700"
+                      : "border-[#244067] bg-[#08172a] text-slate-400"
+                  )}
+                >
+                  {targetPreferences[field]}
+                </span>
+              ) : null}
+            </motion.button>
+          )
+        })}
+      </div>
+
+      <StickyActions
+        backLabel="Back"
+        onBack={onBack}
+        disabled={!selectedTargetJob}
+        note={selectedTargetJob || "Select a target job"}
+        onContinue={onContinue}
+      />
+    </motion.section>
+  )
+}
+
 function BuilderScreen({
   selectedFields,
   targetPreferences,
+  selectedTargetJob,
   linkedinUrl,
   previousResume,
   workHistory,
@@ -1389,6 +1558,7 @@ function BuilderScreen({
 }: {
   selectedFields: string[]
   targetPreferences: TargetPreferences
+  selectedTargetJob: string
   linkedinUrl: string
   previousResume: string
   workHistory: string
@@ -1429,6 +1599,7 @@ function BuilderScreen({
           <TargetSummary
             selectedFields={selectedFields}
             targetPreferences={targetPreferences}
+            selectedTargetJob={selectedTargetJob}
           />
 
           <JobListingsPanel
@@ -1550,15 +1721,18 @@ function BuilderScreen({
 function TargetSummary({
   selectedFields,
   targetPreferences,
+  selectedTargetJob,
 }: {
   selectedFields: string[]
   targetPreferences: TargetPreferences
+  selectedTargetJob: string
 }) {
   return (
     <div className="mb-5 rounded-md border border-[#244067] bg-[#08172a] px-4 py-3">
       <p className="text-xs font-black tracking-[0.16em] text-[#d4af37] uppercase">
         HYFY target fields
       </p>
+      <p className="mt-2 text-xl font-black text-white">{selectedTargetJob}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {selectedFields.map((field) => (
           <span

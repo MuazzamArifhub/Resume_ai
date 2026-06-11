@@ -13,6 +13,8 @@ export type JobListing = {
   location: string | null
   employment_type: string | null
   seniority: string | null
+  target_role: string | null
+  niche: string | null
   source_url: string | null
   description: string
   requirements: string | null

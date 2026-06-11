@@ -7,6 +7,7 @@ export const runtime = "nodejs"
 type GenerateRequest = {
   targetFields?: string[]
   targetPreferences?: Record<string, string>
+  targetJob?: string
   targetCategory?: string
   targetSubfield?: string
   linkedinUrl?: string
@@ -18,6 +19,7 @@ type GenerateRequest = {
 function buildCandidatePrompt({
   targetFields,
   targetPreferences,
+  targetJob,
   targetCategory,
   targetSubfield,
   linkedinUrl,
@@ -33,6 +35,9 @@ ${targetFields?.length ? targetFields.join(", ") : targetCategory || "Not provid
 
 Target subfield:
 ${targetSubfield || "Not provided"}
+
+Specific target job:
+${targetJob || "Not provided"}
 
 Target field preferences:
 ${
@@ -57,7 +62,7 @@ ${jobDescription || "Not provided"}
 
 Important constraints:
 - If the LinkedIn URL cannot be accessed directly, use it only as profile context and rely on the provided resume and work history.
-- Use the selected target fields and field preferences to decide experience ordering, project selection, domain skills, job-match language, and finance language.
+- Use the selected target fields, field preferences, and specific target job to decide experience ordering, project selection, domain skills, job-match language, and finance language.
 - Do not invent employers, degrees, dates, contact details, or credentials that are not supported by the candidate inputs.
 - Keep the resume one page in the provided LaTeX template.
 - Do not use any em dashes in the final output.
